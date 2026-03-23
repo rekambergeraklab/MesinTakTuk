@@ -1,0 +1,58 @@
+name: Build Standalone Apps
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: MesinTakTuk-Windows
+          - os: macos-14 # Apple Silicon Runner
+            artifact_name: MesinTakTuk-MacOS-DMG
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Libraries
+        run: |
+          pip install -r requirements.txt
+
+      - name: Build Windows EXE
+        if: matrix.os == 'windows-latest'
+        run: |
+          pyinstaller --onefile --windowed --name "MesinTakTuk" mesin_tak_tuk_standalone.py
+
+      - name: Build macOS App and DMG
+        if: matrix.os == 'macos-14'
+        run: |
+          brew install create-dmg
+          pyinstaller --windowed --name "MesinTakTuk" mesin_tak_tuk_standalone.py
+          mkdir -p dist/dmg
+          create-dmg \
+            --volname "MesinTakTuk Installer" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "MesinTakTuk.app" 175 120 \
+            --hide-extension "MesinTakTuk.app" \
+            --app-drop-link 425 120 \
+            "dist/MesinTakTuk-Installer.dmg" \
+            "dist/MesinTakTuk.app"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
